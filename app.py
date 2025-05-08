@@ -6,15 +6,32 @@ import uuid
 from pydub import AudioSegment
 import os
 
-# הגדרת הפונט (Heebo מ-Google Fonts)
-def local_css(file_name):
-    with open(file_name) as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
 st.set_page_config(page_title="🔐 Sound Cipher", layout="centered")
-local_css("style.css")
+
+# --- CSS לעיצוב ויישור טקסט ---
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Miriam+Libre&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Miriam Libre', sans-serif;
+        direction: rtl;
+        text-align: right;
+    }
+
+    .stButton button {
+        direction: rtl;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 st.title("🔐 Sound Cipher - הצפנה קולית")
+
+# --- פונקציית המרה ל-WAV ---
+def convert_to_wav(uploaded_file, target_path):
+    audio = AudioSegment.from_file(uploaded_file)
+    audio = audio.set_channels(1)
+    audio.export(target_path, format="wav")
 
 # --- פונקציית הצפנה ---
 def encrypt_message_on_audio(input_wav, output_wav, message, key=300):
@@ -32,7 +49,7 @@ def encrypt_message_on_audio(input_wav, output_wav, message, key=300):
         if index >= len(data):
             break
         ascii_val = ord(char)
-        seconds = int(time_array[int(index)]) % 60
+        seconds = int(time_array[index]) % 60
         new_amplitude = ascii_val - seconds
         data[int(index)] = new_amplitude
 
@@ -53,7 +70,7 @@ def decrypt_message_from_audio(input_wav, key=300):
 
     message = ""
     for index in range(0, len(data), step):
-        seconds = int(time_array[int(index)]) % 60
+        seconds = int(time_array[index]) % 60
         amplitude = data[int(index)]
         ascii_val = round(amplitude + seconds)
         if 32 <= ascii_val <= 126:
@@ -63,18 +80,22 @@ def decrypt_message_from_audio(input_wav, key=300):
     return message
 
 # --- העלאת קובץ ---
-st.subheader("⬆️ העלאת קובץ WAV")
-uploaded_file = st.file_uploader("בחר קובץ קול (WAV)", type=["wav"])
+st.subheader("⬆️ העלאת קובץ קול (כל פורמט)")
+uploaded_file = st.file_uploader("בחר קובץ קול (WAV, MP3, OGG, M4A)", type=["wav", "mp3", "m4a", "ogg"])
 input_wav_path = None
 
 if uploaded_file:
-    input_wav_path = f"uploaded_{uuid.uuid4().hex}.wav"
-    with open(input_wav_path, "wb") as f:
-        f.write(uploaded_file.read())
+    ext = os.path.splitext(uploaded_file.name)[1].lower()
+    input_wav_path = f"converted_{uuid.uuid4().hex}.wav"
+    if ext == ".wav":
+        with open(input_wav_path, "wb") as f:
+            f.write(uploaded_file.read())
+    else:
+        convert_to_wav(uploaded_file, input_wav_path)
 
 # --- קלטים ---
 message = st.text_input("💬 מסר להצפנה")
-key_input = st.text_input("מפתח הצפנה (אופציונלי; מומלץ להגברת האבטחה)", max_chars=4)
+key_input = st.text_input("🔑 מפתח הצפנה (אופציונלי; רק ספרות)", max_chars=4)
 key = int(key_input) if key_input.isdigit() else 300
 
 # --- כפתור הצפנה ---
@@ -91,7 +112,7 @@ if st.button("🔐 הצפן ושלח"):
 
 # --- כפתור פענוח ---
 st.subheader("🔓 פענוח קובץ קול")
-decrypt_file = st.file_uploader("📂 העלה קובץ מוצפן", type=["wav"], key="decrypt")
+decrypt_file = st.file_uploader("📂 העלה קובץ מוצפן (WAV)", type=["wav"], key="decrypt")
 key_decrypt = st.text_input("🔑 מפתח לפענוח (כמו בהצפנה)", key="key_decrypt")
 key_d = int(key_decrypt) if key_decrypt.isdigit() else 300
 
