@@ -5,19 +5,30 @@ from datetime import datetime
 import uuid
 from pydub import AudioSegment
 import os
-from streamlit_webrtc import webrtc_streamer, AudioProcessorBase
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
 import av
+import tempfile
 
 st.set_page_config(page_title="🔐 Sound Cipher", layout="centered")
+st.title("🔐 Sound Cipher - הצפנה קולית")
+
+# --- עיצוב ---
 st.markdown("""
     <style>
-        .stButton>button {
-            text-align: left !important;
+        .stButton > button {
+            float: left;
         }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🔐 Sound Cipher - הצפנה קולית")
+# --- הגדרות הקלטה ---
+class AudioProcessor:
+    def __init__(self):
+        self.frames = []
+
+    def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
+        self.frames.append(frame)
+        return frame
 
 # --- פונקציית הצפנה ---
 def encrypt_message_on_audio(input_wav, output_wav, message, key=300):
@@ -65,86 +76,70 @@ def decrypt_message_from_audio(input_wav, key=300):
             break
     return message
 
-# --- קלט קובץ או הקלטה ---
-st.subheader("⬆️ העלאת קובץ קול להצפנה")
-uploaded_file = st.file_uploader("בחר קובץ קול (נתמך: wav, mp3, ogg, m4a)", type=["wav", "mp3", "ogg", "m4a"])
+# --- העלאת קובץ ---
+st.subheader("⬆️ העלאת קובץ קול")
+record_option = st.selectbox("בחר מקור קול", ["העלה קובץ", "הקלט דרך הדפדפן"])
 input_wav_path = None
 
-if uploaded_file:
-    temp_filename = f"uploaded_{uuid.uuid4().hex}"
-    uploaded_file_path = temp_filename + uploaded_file.name[-4:]
-    with open(uploaded_file_path, "wb") as f:
-        f.write(uploaded_file.read())
-    if not uploaded_file_path.endswith(".wav"):
-        input_wav_path = temp_filename + ".wav"
-        sound = AudioSegment.from_file(uploaded_file_path)
-        sound.export(input_wav_path, format="wav")
-        os.remove(uploaded_file_path)
-    else:
-        input_wav_path = uploaded_file_path
+if record_option == "העלה קובץ":
+    uploaded_file = st.file_uploader("בחר קובץ קול (MP3/WAV/OGG)", type=["wav", "mp3", "ogg"])
+    if uploaded_file:
+        input_wav_path = f"uploaded_{uuid.uuid4().hex}.wav"
+        temp_path = f"temp_{uuid.uuid4().hex}.{uploaded_file.name.split('.')[-1]}"
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_file.read())
+        audio = AudioSegment.from_file(temp_path)
+        audio.export(input_wav_path, format="wav")
+        os.remove(temp_path)
 
-# --- הקלטה מהדפדפן ---
-class AudioRecorder(AudioProcessorBase):
-    def __init__(self):
-        self.audio_frames = []
-
-    def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
-        self.audio_frames.append(frame)
-        return frame
-
-st.subheader("🎙️ או הקלט ישירות מהאתר")
-record = st.checkbox("סמן כאן כדי להקליט דרך הדפדפן")
-recorded_audio_path = None
-
-if record:
-    ctx = webrtc_streamer(
-        key="send_audio",
-        mode="sendonly",
-        in_audio=True,
-        audio_processor_factory=AudioRecorder,
-        media_stream_constraints={"audio": True, "video": False},
+elif record_option == "הקלט דרך הדפדפן":
+    st.info("התחל להקליט והמתן מספר שניות לאחר הסיום לעיבוד הקלט.")
+    audio_ctx = webrtc_streamer(
+        key="audio",
+        mode=WebRtcMode.SENDONLY,
+        client_settings=ClientSettings(
+            media_stream_constraints={"video": False, "audio": True},
+            rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+        ),
+        audio_receiver_size=1024,
+        sendback_audio=False,
     )
 
-    if ctx.audio_processor and st.button("💾 שמור הקלטה"):
-        frames = ctx.audio_processor.audio_frames
-        if frames:
-            audio = AudioSegment.empty()
-            for f in frames:
-                samples = f.to_ndarray().flatten()
-                seg = AudioSegment(
-                    samples.tobytes(),
-                    frame_rate=f.sample_rate,
-                    sample_width=2,
-                    channels=f.layout.channels
-                )
-                audio += seg
+    if audio_ctx and audio_ctx.audio_receiver:
+        audio_frames = []
+        while True:
+            frame = audio_ctx.audio_receiver.recv()
+            if frame is None:
+                break
+            audio_frames.append(frame.to_ndarray().flatten())
 
-            recorded_audio_path = f"recorded_{uuid.uuid4().hex}.wav"
-            audio.export(recorded_audio_path, format="wav")
-            st.success("🎉 ההקלטה נשמרה!")
-            st.audio(recorded_audio_path)
+        if audio_frames:
+            audio_data = np.concatenate(audio_frames).astype(np.int16)
+            input_wav_path = f"recorded_{uuid.uuid4().hex}.wav"
+            wavfile.write(input_wav_path, 48000, audio_data)
+            st.success("✔ ההקלטה נשמרה")
+            st.audio(input_wav_path)
 
-# --- קלטים להצפנה ---
+# --- קלטים ---
 message = st.text_input("💬 מסר להצפנה")
-key_input = st.text_input("מפתח הצפנה (אופציונלי; ברירת מחדל: 300)", max_chars=4)
+key_input = st.text_input("מפתח הצפנה (אופציונלי; מומלץ להגברת האבטחה)", max_chars=4)
 key = int(key_input) if key_input.isdigit() else 300
 
-# --- הצפנה ---
+# --- כפתור הצפנה ---
 if st.button("🔐 הצפן ושלח"):
-    selected_input_path = input_wav_path or recorded_audio_path
-    if not selected_input_path or not message:
-        st.error("יש להעלות או להקליט קובץ קול ולהזין מסר.")
+    if not input_wav_path or not message:
+        st.error("יש לבחור מקור קול ולהזין מסר.")
     else:
         output_path = f"encrypted_{uuid.uuid4().hex}.wav"
-        encrypt_message_on_audio(selected_input_path, output_path, message, key)
+        encrypt_message_on_audio(input_wav_path, output_path, message, key)
         st.success("✔ ההצפנה הושלמה!")
         st.audio(output_path)
         with open(output_path, "rb") as f:
             st.download_button("📥 הורד את הקובץ המוצפן", f, file_name="encrypted.wav")
 
-# --- פענוח ---
+# --- כפתור פענוח ---
 st.subheader("🔓 פענוח קובץ קול")
-decrypt_file = st.file_uploader("📂 העלה קובץ מוצפן (WAV בלבד)", type=["wav"], key="decrypt")
+decrypt_file = st.file_uploader("📂 העלה קובץ מוצפן", type=["wav"], key="decrypt")
 key_decrypt = st.text_input("🔑 מפתח לפענוח (כמו בהצפנה)", key="key_decrypt")
 key_d = int(key_decrypt) if key_decrypt.isdigit() else 300
 
