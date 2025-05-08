@@ -67,7 +67,7 @@ if uploaded_file:
 
 # --- קלטים ---
 message = st.text_input("💬 מסר להצפנה")
-key_input = st.text_input("🔢 מפתח הצפנה (ברירת מחדל: 300)", max_chars=4)
+key_input = st.text_input("מפתח הצפנה (אופציונלי; מומלץ להגברת האבטחה)", max_chars=4)
 key = int(key_input) if key_input.isdigit() else 300
 
 # --- כפתור הצפנה ---
