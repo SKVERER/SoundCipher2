@@ -5,9 +5,6 @@ from datetime import datetime
 import uuid
 from pydub import AudioSegment
 import os
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
-import av
-import tempfile
 
 st.set_page_config(page_title="🔐 Sound Cipher", layout="centered")
 st.title("🔐 Sound Cipher - הצפנה קולית")
@@ -18,17 +15,12 @@ st.markdown("""
         .stButton > button {
             float: left;
         }
+        .css-1v0mbdj, .css-1cpxqw2, .css-ffhzg2, .css-1oe5cao {
+            direction: rtl;
+            text-align: right;
+        }
     </style>
 """, unsafe_allow_html=True)
-
-# --- הגדרות הקלטה ---
-class AudioProcessor:
-    def __init__(self):
-        self.frames = []
-
-    def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
-        self.frames.append(frame)
-        return frame
 
 # --- פונקציית הצפנה ---
 def encrypt_message_on_audio(input_wav, output_wav, message, key=300):
@@ -78,7 +70,7 @@ def decrypt_message_from_audio(input_wav, key=300):
 
 # --- העלאת קובץ ---
 st.subheader("⬆️ העלאת קובץ קול")
-record_option = st.selectbox("בחר מקור קול", ["העלה קובץ", "הקלט דרך הדפדפן"])
+record_option = st.selectbox("בחר מקור קול", ["העלה קובץ"])
 input_wav_path = None
 
 if record_option == "העלה קובץ":
@@ -91,34 +83,6 @@ if record_option == "העלה קובץ":
         audio = AudioSegment.from_file(temp_path)
         audio.export(input_wav_path, format="wav")
         os.remove(temp_path)
-
-elif record_option == "הקלט דרך הדפדפן":
-    st.info("התחל להקליט והמתן מספר שניות לאחר הסיום לעיבוד הקלט.")
-    audio_ctx = webrtc_streamer(
-        key="audio",
-        mode=WebRtcMode.SENDONLY,
-        client_settings=ClientSettings(
-            media_stream_constraints={"video": False, "audio": True},
-            rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-        ),
-        audio_receiver_size=1024,
-        sendback_audio=False,
-    )
-
-    if audio_ctx and audio_ctx.audio_receiver:
-        audio_frames = []
-        while True:
-            frame = audio_ctx.audio_receiver.recv()
-            if frame is None:
-                break
-            audio_frames.append(frame.to_ndarray().flatten())
-
-        if audio_frames:
-            audio_data = np.concatenate(audio_frames).astype(np.int16)
-            input_wav_path = f"recorded_{uuid.uuid4().hex}.wav"
-            wavfile.write(input_wav_path, 48000, audio_data)
-            st.success("✔ ההקלטה נשמרה")
-            st.audio(input_wav_path)
 
 # --- קלטים ---
 message = st.text_input("💬 מסר להצפנה")
