@@ -6,7 +6,14 @@ import uuid
 from pydub import AudioSegment
 import os
 
+# הגדרת הפונט (Heebo מ-Google Fonts)
+def local_css(file_name):
+    with open(file_name) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
 st.set_page_config(page_title="🔐 Sound Cipher", layout="centered")
+local_css("style.css")
+
 st.title("🔐 Sound Cipher - הצפנה קולית")
 
 # --- פונקציית הצפנה ---
@@ -25,7 +32,7 @@ def encrypt_message_on_audio(input_wav, output_wav, message, key=300):
         if index >= len(data):
             break
         ascii_val = ord(char)
-        seconds = int(time_array[index]) % 60
+        seconds = int(time_array[int(index)]) % 60
         new_amplitude = ascii_val - seconds
         data[int(index)] = new_amplitude
 
@@ -46,7 +53,7 @@ def decrypt_message_from_audio(input_wav, key=300):
 
     message = ""
     for index in range(0, len(data), step):
-        seconds = int(time_array[index]) % 60
+        seconds = int(time_array[int(index)]) % 60
         amplitude = data[int(index)]
         ascii_val = round(amplitude + seconds)
         if 32 <= ascii_val <= 126:
