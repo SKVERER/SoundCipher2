@@ -8,32 +8,30 @@ import os
 
 st.set_page_config(page_title="🔐 Sound Cipher", layout="centered")
 
-# --- CSS לעיצוב ויישור טקסט ---
+# --- CSS: יישור טקסט לימין, כפתורים שמאלה ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Miriam+Libre&display=swap');
-
     html, body, [class*="css"] {
-        font-family: 'Miriam Libre', sans-serif;
         direction: rtl;
         text-align: right;
     }
 
-    .stButton button {
+    button {
         direction: rtl;
+        float: left;
     }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🔐 Sound Cipher - הצפנה קולית")
 
-# --- פונקציית המרה ל-WAV ---
+# --- המרת קובץ לקובץ WAV ---
 def convert_to_wav(uploaded_file, target_path):
     audio = AudioSegment.from_file(uploaded_file)
     audio = audio.set_channels(1)
     audio.export(target_path, format="wav")
 
-# --- פונקציית הצפנה ---
+# --- הצפנה ---
 def encrypt_message_on_audio(input_wav, output_wav, message, key=300):
     sample_rate, data = wavfile.read(input_wav)
     if len(data.shape) > 1:
@@ -57,7 +55,7 @@ def encrypt_message_on_audio(input_wav, output_wav, message, key=300):
     wavfile.write(output_wav, sample_rate, data)
     return output_wav
 
-# --- פונקציית פענוח ---
+# --- פענוח ---
 def decrypt_message_from_audio(input_wav, key=300):
     sample_rate, data = wavfile.read(input_wav)
     if len(data.shape) > 1:
@@ -112,7 +110,7 @@ if st.button("🔐 הצפן ושלח"):
 
 # --- כפתור פענוח ---
 st.subheader("🔓 פענוח קובץ קול")
-decrypt_file = st.file_uploader("📂 העלה קובץ מוצפן (WAV)", type=["wav"], key="decrypt")
+decrypt_file = st.file_uploader("📂 העלה קובץ מוצפן (WAV בלבד)", type=["wav"], key="decrypt")
 key_decrypt = st.text_input("🔑 מפתח לפענוח (כמו בהצפנה)", key="key_decrypt")
 key_d = int(key_decrypt) if key_decrypt.isdigit() else 300
 
