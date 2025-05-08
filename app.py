@@ -70,19 +70,17 @@ def decrypt_message_from_audio(input_wav, key=300):
 
 # --- העלאת קובץ ---
 st.subheader("⬆️ העלאת קובץ קול")
-record_option = st.selectbox("בחר מקור קול", ["העלה קובץ"])
 input_wav_path = None
 
-if record_option == "העלה קובץ":
-    uploaded_file = st.file_uploader("בחר קובץ קול (MP3/WAV/OGG)", type=["wav", "mp3", "ogg"])
-    if uploaded_file:
-        input_wav_path = f"uploaded_{uuid.uuid4().hex}.wav"
-        temp_path = f"temp_{uuid.uuid4().hex}.{uploaded_file.name.split('.')[-1]}"
-        with open(temp_path, "wb") as f:
-            f.write(uploaded_file.read())
-        audio = AudioSegment.from_file(temp_path)
-        audio.export(input_wav_path, format="wav")
-        os.remove(temp_path)
+uploaded_file = st.file_uploader("בחר קובץ קול (MP3/WAV/OGG/M4A)", type=["wav", "mp3", "ogg", "m4a"])
+if uploaded_file:
+    input_wav_path = f"uploaded_{uuid.uuid4().hex}.wav"
+    temp_path = f"temp_{uuid.uuid4().hex}.{uploaded_file.name.split('.')[-1]}"
+    with open(temp_path, "wb") as f:
+        f.write(uploaded_file.read())
+    audio = AudioSegment.from_file(temp_path)
+    audio.export(input_wav_path, format="wav")
+    os.remove(temp_path)
 
 # --- קלטים ---
 message = st.text_input("💬 מסר להצפנה")
@@ -92,7 +90,7 @@ key = int(key_input) if key_input.isdigit() else 300
 # --- כפתור הצפנה ---
 if st.button("🔐 הצפן ושלח"):
     if not input_wav_path or not message:
-        st.error("יש לבחור מקור קול ולהזין מסר.")
+        st.error("יש להעלות קובץ קול ולהזין מסר.")
     else:
         output_path = f"encrypted_{uuid.uuid4().hex}.wav"
         encrypt_message_on_audio(input_wav_path, output_path, message, key)
